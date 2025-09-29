@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 	"user-service/models"
 	"user-service/repository"
@@ -64,7 +65,7 @@ func (s *UserService) ResetPassword(ctx context.Context, email, newPassword stri
 }
 
 // Register registers a new user
-func (s *UserService) Register(ctx context.Context, req *models.UserRequest) (*models.UserResponse, error) {
+func (s *UserService) Register(ctx context.Context, req *models.RegisterRequest) (*models.RegisterResponse, error) {
 	hash, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
@@ -80,12 +81,12 @@ func (s *UserService) Register(ctx context.Context, req *models.UserRequest) (*m
 		return nil, err
 	}
 	// TODO: send verification email/OTP here if needed
-	resp := &models.UserResponse{ID: user.ID, Email: user.Email}
+	resp := &models.RegisterResponse{ID: user.ID, Email: user.Email}
 	return resp, nil
 }
 
 // Login logs in a user
-func (s *UserService) Login(ctx context.Context, req *models.UserRequest) (*models.UserResponse, error) {
+func (s *UserService) Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error) {
 	user, err := s.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, err
@@ -93,8 +94,12 @@ func (s *UserService) Login(ctx context.Context, req *models.UserRequest) (*mode
 	if err := utils.CheckPassword(user.Password, req.Password); err != nil {
 		return nil, err
 	}
-	token, _ := utils.CreateToken(user.ID, 24*time.Hour)
-	resp := &models.UserResponse{ID: user.ID, Email: user.Email, Token: token}
+	accessToken, _ := utils.CreateToken(user.ID, 15*time.Minute)
+	refreshToken, _ := utils.CreateToken(user.ID, 7*24*time.Hour)
+	resp := &models.LoginResponse{ID: user.ID, Email: user.Email, Token: accessToken}
+	// Optionally, add refreshToken to resp struct or return as a separate value
+	// For now, just log it (in production, send as httpOnly cookie or in response)
+	zap.L().Info("Refresh token generated", zap.String("refreshToken", refreshToken))
 	return resp, nil
 }
 
@@ -107,9 +112,26 @@ func (s *UserService) Logout(ctx context.Context, userID string) error {
 
 // Refresh refreshes the JWT token
 func (s *UserService) Refresh(ctx context.Context, refreshToken string) (string, error) {
-	zap.L().Info("Refresh called", zap.String("refreshToken", refreshToken))
-	// TODO: Implement JWT refresh logic
-	return "", nil
+	claims, err := utils.ParseToken(refreshToken)
+	if err != nil {
+		return "", err
+	}
+	// Optionally, check if token is blacklisted or revoked
+	userID := claims.Subject
+	// Generate new access token
+	// You may want to check user existence or status here
+	// Convert userID to uint if needed
+	// For simplicity, assume userID is valid
+	var uid uint
+	_, err = fmt.Sscanf(userID, "%d", &uid)
+	if err != nil {
+		return "", err
+	}
+	newAccessToken, err := utils.CreateToken(uid, 15*time.Minute)
+	if err != nil {
+		return "", err
+	}
+	return newAccessToken, nil
 }
 
 // ForgotPassword handles the password reset request
@@ -118,7 +140,6 @@ func (s *UserService) ForgotPassword(ctx context.Context, email string) error {
 	// TODO: Implement password reset request logic (send OTP/email)
 	return nil
 }
-
 
 // VerifyEmail verifies the user's email
 func (s *UserService) VerifyEmail(ctx context.Context, tokenOrOTP string) error {

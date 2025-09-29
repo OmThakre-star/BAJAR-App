@@ -28,18 +28,25 @@ func NewUserRouter(userController *controller.UserController) *mux.Router {
 		{"/auth/reset-password", "POST", userController.ResetPassword, false},
 		{"/auth/verify-email", "POST", userController.VerifyEmail, false},
 		{"/api/me", "GET", userController.GetProfile, true},
-		{"/api/users", "GET", userController.ListUsers, true},
+		{"/api/me", "PUT", userController.UpdateProfile, true},
+		{"api/delete-account", "DELETE", userController.DeleteAccount, true},
+		{"/api/change-password", "POST", userController.ChangePassword, true},
 		{"/admin/users", "GET", userController.AdminListUsers, true},
 		{"/admin/users/{id}", "GET", userController.AdminGetUser, true},
 		{"/admin/users/{id}/role", "PUT", userController.AdminUpdateRole, true},
 		{"/admin/users/{id}", "DELETE", userController.AdminDeleteUser, true},
 	}
 
+	admin := r.PathPrefix("/admin").Subrouter()
+	admin.Use(middleware.JwtAuthMiddleware)
+
 	for _, route := range routes {
 		if route.Protected {
-			s := r.PathPrefix("/admin").Subrouter()
-			s.Use(middleware.JwtAuthMiddleware)
-			s.HandleFunc(route.Path[len("/admin"):], route.Handler).Methods(route.Method)
+			if len(route.Path) >= 6 && route.Path[:6] == "/admin" {
+				admin.HandleFunc(route.Path[len("/admin"):], route.Handler).Methods(route.Method)
+			} else {
+				r.Handle(route.Path, middleware.JwtAuthMiddleware(http.HandlerFunc(route.Handler))).Methods(route.Method)
+			}
 		} else {
 			r.HandleFunc(route.Path, route.Handler).Methods(route.Method)
 		}

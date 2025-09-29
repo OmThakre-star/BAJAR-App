@@ -14,7 +14,8 @@ type User struct {
 	Role      string    `gorm:"size:50;default:'user'" json:"role"`
 }
 
-type UserRequest struct {
+// Register
+type RegisterRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -22,8 +23,35 @@ type UserRequest struct {
 	Address  string `json:"address"`
 }
 
+type RegisterResponse struct {
+	ID    uint   `json:"id"`
+	Email string `json:"email"`
+}
+
+// Login
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	ID    uint   `json:"id"`
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
 type UserResponse struct {
 	ID    uint   `json:"id"`
 	Email string `json:"email"`
 	Token string `json:"token,omitempty"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+// UpdateRole
+type UpdateRoleRequest struct {
+	Role string `json:"role"`
 }

@@ -3,6 +3,8 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"user-service/models"
 	"user-service/utils"
 
 	"go.uber.org/zap"
@@ -15,11 +17,18 @@ import (
 // @Success 200 {object} models.User
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
+// @Security BearerAuth
 // @Router /api/me [get]
 func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {
-	uid, ok := r.Context().Value("userID").(string)
-	if !ok {
-		uc.Logger.Error("Invalid user id in context", zap.Any("userID", r.Context().Value("userID")))
+	val := r.Context().Value("userID")
+	var uid string
+	switch v := val.(type) {
+	case string:
+		uid = v
+	case int:
+		uid = strconv.Itoa(v)
+	default:
+		uc.Logger.Error("Invalid user id in context", zap.Any("userID", val))
 		http.Error(w, "invalid user id", http.StatusBadRequest)
 		return
 	}
@@ -44,6 +53,7 @@ func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /api/me [put]
 func (uc *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
@@ -86,11 +96,12 @@ func (uc *UserController) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 // @Tags User
 // @Accept json
 // @Produce json
-// @Param password body string true "Old and new password"
+// @Param password body models.ChangePasswordRequest true "Old and new password"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /api/change-password [post]
 func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
@@ -99,11 +110,9 @@ func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "userID missing", http.StatusBadRequest)
 		return
 	}
-	var req struct {
-		OldPassword string `json:"old_password"`
-		NewPassword string `json:"new_password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
+	var ChangePasswordRequest models.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&ChangePasswordRequest); err != nil {
 		uc.Logger.Error("ChangePassword: invalid JSON", zap.Error(err))
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
@@ -114,12 +123,12 @@ func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	if err := utils.CheckPassword(user.Password, req.OldPassword); err != nil {
+	if err := utils.CheckPassword(user.Password, ChangePasswordRequest.OldPassword); err != nil {
 		uc.Logger.Error("ChangePassword: old password incorrect", zap.Error(err))
 		http.Error(w, "old password incorrect", http.StatusUnauthorized)
 		return
 	}
-	hash, err := utils.HashPassword(req.NewPassword)
+	hash, err := utils.HashPassword(ChangePasswordRequest.NewPassword)
 	if err != nil {
 		uc.Logger.Error("ChangePassword: hash failed", zap.Error(err))
 		http.Error(w, "hash failed", http.StatusInternalServerError)
@@ -143,6 +152,7 @@ func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request)
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /api/delete-account [delete]
 func (uc *UserController) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value("userID").(string)
@@ -167,6 +177,7 @@ func (uc *UserController) DeleteAccount(w http.ResponseWriter, r *http.Request) 
 // @Produce json
 // @Success 200 {array} models.User
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /admin/users [get]
 func (uc *UserController) ListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := uc.UserService.ListUsers(r.Context())
@@ -191,6 +202,7 @@ func (uc *UserController) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Param role query string false "User role"
 // @Success 200 {array} models.User
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /admin/users [get]
 func (uc UserController) AdminListUsers(w http.ResponseWriter, r *http.Request) {
 	// Example: parse pagination/filter params from query
@@ -236,17 +248,16 @@ func (uc UserController) AdminGetUser(w http.ResponseWriter, r *http.Request) {
 // @Accept json
 // @Produce json
 // @Param id path string true "User ID"
-// @Param role body string true "New role"
+// @Param role body models.UpdateRoleRequest true "New role"
 // @Success 200 {object} models.User
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /admin/users/{id}/role [put]
 func (uc UserController) AdminUpdateRole(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/admin/users/") : len(r.URL.Path)-len("/role")]
-	var req struct {
-		Role string `json:"role"`
-	}
+	var req models.UpdateRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		uc.Logger.Error("AdminUpdateRole: invalid JSON", zap.Error(err))
 		http.Error(w, "invalid json", http.StatusBadRequest)
@@ -258,7 +269,7 @@ func (uc UserController) AdminUpdateRole(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	// user.Role = req.Role // FIX: Role field missing in User struct, update logic after adding Role field
+	user.Role = req.Role
 	if err := uc.UserService.UpdateUser(r.Context(), user); err != nil {
 		uc.Logger.Error("AdminUpdateRole: update failed", zap.Error(err))
 		http.Error(w, "update failed", http.StatusInternalServerError)
@@ -275,6 +286,7 @@ func (uc UserController) AdminUpdateRole(w http.ResponseWriter, r *http.Request)
 // @Param id path string true "User ID"
 // @Success 200 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /admin/users/{id} [delete]
 func (uc UserController) AdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/admin/users/"):] // crude extraction, use mux vars in real code

@@ -19,19 +19,19 @@ type UserController struct {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param user body models.UserRequest true "User registration info"
-// @Success 200 {object} models.UserResponse
+// @Param user body models.RegisterRequest true "User registration info"
+// @Success 200 {object} models.RegisterResponse
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /auth/register [post]
 func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) {
-	var userReq models.UserRequest
-	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
+	var req models.RegisterRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		uc.Logger.Error("Invalid JSON in Register", zap.Error(err))
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	resp, err := uc.UserService.Register(r.Context(), &userReq)
+	resp, err := uc.UserService.Register(r.Context(), &req)
 	if err != nil {
 		uc.Logger.Error("User registration failed", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -46,21 +46,21 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param user body models.UserRequest true "User login info"
-// @Success 200 {object} models.UserResponse
+// @Param user body models.LoginRequest true "User login info"
+// @Success 200 {object} models.LoginResponse
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Router /auth/login [post]
 func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
-	var userReq models.UserRequest
-	if err := json.NewDecoder(r.Body).Decode(&userReq); err != nil {
+	var req models.LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		uc.Logger.Error("Invalid JSON in Login", zap.Error(err))
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	resp, err := uc.UserService.Login(r.Context(), &userReq)
+	resp, err := uc.UserService.Login(r.Context(), &req)
 	if err != nil {
-		uc.Logger.Error("User login failed", zap.Error(err), zap.String("email", userReq.Email))
+		uc.Logger.Error("User login failed", zap.Error(err), zap.String("email", req.Email))
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -75,6 +75,7 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
+// @Security BearerAuth
 // @Router /auth/logout [post]
 func (uc UserController) Logout(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID")
