@@ -25,7 +25,7 @@ type Config struct {
 }
 
 func Load() *Config {
-	cfg, err := LoadYamlConfig("../../config/userConfig.yaml")
+	cfg, err := LoadYamlConfig("./config/userConfig.yaml")
 	if err != nil {
 		log.Fatalf("Could not load userConfig.yaml: %v", err)
 	}
